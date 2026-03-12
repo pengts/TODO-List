@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -22,8 +23,7 @@ type NotePage struct {
 
 // AppSettings 应用设置
 type AppSettings struct {
-	AlwaysOnTop  bool `json:"alwaysOnTop"`
-	ActivePageID string `json:"activePageId"`
+	AlwaysOnTop map[string]bool `json:"alwaysOnTop"`
 }
 
 // AppData 持久化数据
@@ -36,15 +36,17 @@ type AppData struct {
 type App struct {
 	ctx      context.Context
 	dataPath string
+	pageID   string
 }
 
 // NewApp 创建应用实例
-func NewApp() *App {
+func NewApp(pageID string) *App {
 	home, _ := os.UserHomeDir()
 	dir := filepath.Join(home, ".todo-list")
 	os.MkdirAll(dir, 0755)
 	return &App{
 		dataPath: filepath.Join(dir, "data.json"),
+		pageID:   pageID,
 	}
 }
 
@@ -53,7 +55,12 @@ func (a *App) startup(ctx context.Context) {
 }
 
 func (a *App) beforeClose(ctx context.Context) bool {
-	return false // 允许关闭
+	return false
+}
+
+// GetPageID 返回当前窗口绑定的pageID
+func (a *App) GetPageID() string {
+	return a.pageID
 }
 
 // LoadData 从JSON文件加载数据
@@ -66,11 +73,17 @@ func (a *App) LoadData() *AppData {
 	if err := json.Unmarshal(data, &appData); err != nil {
 		return nil
 	}
+	if appData.Settings.AlwaysOnTop == nil {
+		appData.Settings.AlwaysOnTop = make(map[string]bool)
+	}
 	return &appData
 }
 
 // SaveData 保存数据到JSON文件
 func (a *App) SaveData(appData AppData) error {
+	if appData.Settings.AlwaysOnTop == nil {
+		appData.Settings.AlwaysOnTop = make(map[string]bool)
+	}
 	data, err := json.MarshalIndent(appData, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal error: %w", err)
@@ -81,6 +94,18 @@ func (a *App) SaveData(appData AppData) error {
 // GenerateID 生成唯一ID
 func (a *App) GenerateID() string {
 	return fmt.Sprintf("%x%x", time.Now().UnixNano(), time.Now().UnixMicro()%0xFFFF)
+}
+
+// NewWindow 启动新窗口进程
+func (a *App) NewWindow(pageID string) error {
+	exePath, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	cmd := exec.Command(exePath, "--page-id", pageID)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Start()
 }
 
 // WindowMinimise 最小化窗口
@@ -96,13 +121,4 @@ func (a *App) WindowClose() {
 // SetAlwaysOnTop 设置窗口置顶
 func (a *App) SetAlwaysOnTop(onTop bool) {
 	runtime.WindowSetAlwaysOnTop(a.ctx, onTop)
-}
-
-// GetAlwaysOnTop 获取置顶状态（从持久化数据读取）
-func (a *App) GetAlwaysOnTop() bool {
-	appData := a.LoadData()
-	if appData == nil {
-		return false
-	}
-	return appData.Settings.AlwaysOnTop
 }

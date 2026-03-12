@@ -7,14 +7,14 @@
 :root {
   --bg-primary: #d4edbc;
   --bg-titlebar: #c6e4a5;
-  --bg-tabs: #cbe8af;
   --bg-toolbar: #c6e4a5;
   --bg-hover: #b8dc94;
   --bg-active: #a8d080;
   --text-primary: #1a1a1a;
   --text-secondary: #4a4a4a;
-  --text-muted: #7a7a7a;
+  --text-muted: #999;
   --border-color: #b0d490;
+  --shadow: 0 2px 12px rgba(0,0,0,0.12);
 }
 
 html, body, #app {
@@ -30,17 +30,25 @@ html, body, #app {
 #app {
   display: flex;
   flex-direction: column;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.hidden {
+  display: none !important;
 }
 
 /* ---- 标题栏 ---- */
 .titlebar {
   display: flex;
   align-items: center;
-  height: 36px;
+  height: 40px;
   background: var(--bg-titlebar);
-  padding: 0 4px;
+  padding: 0 6px;
   user-select: none;
   flex-shrink: 0;
+  gap: 2px;
 }
 
 .titlebar .drag-region {
@@ -50,8 +58,8 @@ html, body, #app {
 }
 
 .titlebar-btn {
-  width: 32px;
-  height: 28px;
+  width: 34px;
+  height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -59,124 +67,56 @@ html, body, #app {
   border: none;
   color: var(--text-secondary);
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: 6px;
+  transition: background 0.15s, color 0.15s;
 }
 
 .titlebar-btn:hover {
   background: var(--bg-hover);
 }
 
-.close-btn:hover {
-  background: #e04848;
-  color: #fff;
+.add-btn {
+  color: var(--text-secondary);
 }
 
-/* 菜单 */
-.menu-container {
-  position: relative;
-}
-
-.dropdown-menu {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  background: #fff;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  min-width: 120px;
-  padding: 4px 0;
-  z-index: 100;
-}
-
-.menu-item {
-  padding: 6px 16px;
-  cursor: pointer;
-  font-size: 13px;
+.add-btn:hover {
+  background: var(--bg-hover);
   color: var(--text-primary);
 }
 
-.menu-item:hover {
-  background: var(--bg-primary);
+/* 大头钉按钮 */
+.pin-btn {
+  color: var(--text-muted);
 }
 
-.hidden {
-  display: none !important;
-}
-
-/* ---- 页签栏 ---- */
-.page-tabs {
-  display: flex;
-  height: 32px;
-  background: var(--bg-tabs);
-  padding: 0 4px;
-  gap: 2px;
-  align-items: flex-end;
-  overflow-x: auto;
-  overflow-y: hidden;
-  flex-shrink: 0;
-}
-
-.page-tabs::-webkit-scrollbar {
-  height: 0;
-}
-
-.tab {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  font-size: 12px;
+.pin-btn:hover {
+  background: var(--bg-hover);
   color: var(--text-secondary);
-  cursor: pointer;
-  border-radius: 6px 6px 0 0;
-  max-width: 120px;
-  white-space: nowrap;
-  user-select: none;
 }
 
-.tab:hover {
+.pin-btn.active {
+  color: var(--text-primary);
+}
+
+.pin-btn.active:hover {
   background: var(--bg-hover);
 }
 
-.tab.active {
-  background: var(--bg-primary);
-  color: var(--text-primary);
-}
-
-.tab-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.tab-close {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  border-radius: 3px;
-  flex-shrink: 0;
-}
-
-.tab-close:hover {
-  background: var(--bg-active);
-  color: var(--text-primary);
+/* 关闭按钮 */
+.close-btn:hover {
+  background: #e04848;
+  color: #fff;
 }
 
 /* ---- 编辑器 ---- */
 .editor-container {
   flex: 1;
   overflow-y: auto;
-  padding: 12px 16px;
+  padding: 14px 18px;
 }
 
 .editor-container::-webkit-scrollbar {
-  width: 6px;
+  width: 5px;
 }
 
 .editor-container::-webkit-scrollbar-track {
@@ -188,22 +128,39 @@ html, body, #app {
   border-radius: 3px;
 }
 
+.editor-container::-webkit-scrollbar-thumb:hover {
+  background: var(--bg-active);
+}
+
 .note-editor {
   min-height: 100%;
   outline: none;
-  line-height: 1.6;
+  line-height: 1.7;
   word-wrap: break-word;
   white-space: pre-wrap;
+  color: var(--text-primary);
+  font-size: 14px;
 }
 
+/* placeholder */
+.note-editor[data-placeholder]:empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-muted);
+  font-style: italic;
+  pointer-events: none;
+}
+
+/* 列表 - 确保深色字体 */
 .note-editor ol,
 .note-editor ul {
   padding-left: 24px;
-  margin: 2px 0;
+  margin: 4px 0;
+  color: var(--text-primary);
 }
 
 .note-editor li {
   padding-left: 2px;
+  color: var(--text-primary);
 }
 
 /* TODO checkbox */
@@ -214,8 +171,10 @@ html, body, #app {
 
 .note-editor ul.todo-list li {
   position: relative;
-  padding-left: 24px;
+  padding-left: 26px;
   cursor: default;
+  color: var(--text-primary);
+  margin: 2px 0;
 }
 
 .note-editor ul.todo-list li::before {
@@ -225,15 +184,20 @@ html, body, #app {
   top: 4px;
   width: 16px;
   height: 16px;
-  border: 2px solid var(--text-secondary);
-  border-radius: 3px;
+  border: 2px solid #8ab86e;
+  border-radius: 4px;
   cursor: pointer;
   background: transparent;
+  transition: all 0.15s;
+}
+
+.note-editor ul.todo-list li:hover::before {
+  border-color: #6da050;
 }
 
 .note-editor ul.todo-list li[data-checked="true"]::before {
-  background: var(--bg-active);
-  border-color: var(--bg-active);
+  background: #8ab86e;
+  border-color: #8ab86e;
 }
 
 .note-editor ul.todo-list li[data-checked="true"]::after {
@@ -257,17 +221,17 @@ html, body, #app {
 .format-toolbar {
   display: flex;
   align-items: center;
-  height: 40px;
+  height: 42px;
   background: var(--bg-toolbar);
-  padding: 0 8px;
+  padding: 0 10px;
   gap: 2px;
   border-top: 1px solid var(--border-color);
   flex-shrink: 0;
 }
 
 .toolbar-btn {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -275,13 +239,15 @@ html, body, #app {
   border: none;
   color: var(--text-secondary);
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: 6px;
   font-size: 14px;
   font-family: inherit;
+  transition: background 0.15s, color 0.15s;
 }
 
 .toolbar-btn:hover {
   background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .toolbar-btn:active {
@@ -290,7 +256,7 @@ html, body, #app {
 
 .toolbar-divider {
   width: 1px;
-  height: 20px;
+  height: 22px;
   background: var(--border-color);
-  margin: 0 4px;
+  margin: 0 6px;
 }

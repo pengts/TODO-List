@@ -23,10 +23,10 @@ async function callGo(fn, ...args) {
 
 // ---- 状态 ----
 let state = {
-  pages: [],
-  activePageId: '',
-  alwaysOnTop: false,
-  menuOpen: false,
+  page: null,      // 当前窗口的页面
+  pageId: '',      // 当前窗口绑定的pageId
+  allData: null,   // 全部数据（用于保存）
+  pinned: false,
 };
 
 let saveTimer = null;
@@ -35,46 +35,61 @@ function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
-function createDefaultPage(title) {
-  return {
-    id: generateId(),
-    title: title || 'TODO',
-    content: '',
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  };
-}
-
-function getActivePage() {
-  return state.pages.find(p => p.id === state.activePageId) || state.pages[0];
-}
-
 // ---- 持久化 ----
 function scheduleSave() {
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    callGo('SaveData', {
-      pages: state.pages,
-      settings: {
-        alwaysOnTop: state.alwaysOnTop,
-        activePageId: state.activePageId,
-      },
-    });
+    if (!state.allData || !state.page) return;
+    // 更新当前page到allData
+    const idx = state.allData.pages.findIndex(p => p.id === state.pageId);
+    if (idx >= 0) {
+      state.allData.pages[idx] = state.page;
+    }
+    // 保存置顶状态
+    if (!state.allData.settings.alwaysOnTop) state.allData.settings.alwaysOnTop = {};
+    state.allData.settings.alwaysOnTop[state.pageId] = state.pinned;
+    callGo('SaveData', state.allData);
   }, 300);
 }
 
 async function loadData() {
+  // 获取当前窗口绑定的pageId
+  state.pageId = await callGo('GetPageID') || '';
+
   const data = await callGo('LoadData');
   if (data && data.pages && data.pages.length > 0) {
-    state.pages = data.pages;
-    state.activePageId = data.settings?.activePageId || data.pages[0].id;
-    state.alwaysOnTop = data.settings?.alwaysOnTop || false;
+    if (!data.settings) data.settings = {};
+    if (!data.settings.alwaysOnTop) data.settings.alwaysOnTop = {};
+    state.allData = data;
+
+    if (state.pageId) {
+      state.page = data.pages.find(p => p.id === state.pageId);
+    }
+    if (!state.page) {
+      // 没指定pageId或找不到，用第一个
+      state.page = data.pages[0];
+      state.pageId = state.page.id;
+    }
+    state.pinned = data.settings.alwaysOnTop[state.pageId] || false;
   } else {
-    const page = createDefaultPage();
-    state.pages = [page];
-    state.activePageId = page.id;
+    // 首次启动，创建默认页
+    const page = {
+      id: generateId(),
+      title: '',
+      content: '',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    state.page = page;
+    state.pageId = page.id;
+    state.allData = {
+      pages: [page],
+      settings: { alwaysOnTop: {} },
+    };
+    scheduleSave();
   }
-  if (state.alwaysOnTop) {
+
+  if (state.pinned) {
     callGo('SetAlwaysOnTop', true);
   }
 }
@@ -84,18 +99,8 @@ function render() {
   const app = document.getElementById('app');
   app.innerHTML = '';
   app.appendChild(renderTitleBar());
-  app.appendChild(renderPageTabs());
   app.appendChild(renderEditor());
   app.appendChild(renderFormatToolbar());
-
-  // 关闭菜单的全局点击
-  document.addEventListener('click', (e) => {
-    if (!e.target.closest('.menu-container') && state.menuOpen) {
-      state.menuOpen = false;
-      const menu = document.querySelector('.dropdown-menu');
-      if (menu) menu.classList.add('hidden');
-    }
-  });
 }
 
 // ---- 标题栏 ----
@@ -103,63 +108,44 @@ function renderTitleBar() {
   const bar = document.createElement('div');
   bar.className = 'titlebar';
 
-  // + 按钮
+  // + 新建窗口按钮
   const addBtn = document.createElement('button');
-  addBtn.className = 'titlebar-btn';
-  addBtn.title = '新建页面';
-  addBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 14 14">
-    <line x1="7" y1="1" x2="7" y2="13" stroke="currentColor" stroke-width="2"/>
-    <line x1="1" y1="7" x2="13" y2="7" stroke="currentColor" stroke-width="2"/>
+  addBtn.className = 'titlebar-btn add-btn';
+  addBtn.title = '新建便签';
+  addBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16">
+    <line x1="8" y1="2" x2="8" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    <line x1="2" y1="8" x2="14" y2="8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
   </svg>`;
-  addBtn.onclick = () => {
-    const page = createDefaultPage('Page ' + (state.pages.length + 1));
-    state.pages.push(page);
-    state.activePageId = page.id;
-    scheduleSave();
-    render();
+  addBtn.onclick = async () => {
+    const newPage = {
+      id: generateId(),
+      title: '',
+      content: '',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    state.allData.pages.push(newPage);
+    // 先保存再开新窗口
+    await callGo('SaveData', state.allData);
+    await callGo('NewWindow', newPage.id);
   };
 
   // 拖拽区
   const drag = document.createElement('div');
   drag.className = 'drag-region';
 
-  // 菜单
-  const menuContainer = document.createElement('div');
-  menuContainer.className = 'menu-container';
-
-  const menuBtn = document.createElement('button');
-  menuBtn.className = 'titlebar-btn';
-  menuBtn.title = '菜单';
-  menuBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 14 14">
-    <circle cx="3" cy="7" r="1.5" fill="currentColor"/>
-    <circle cx="7" cy="7" r="1.5" fill="currentColor"/>
-    <circle cx="11" cy="7" r="1.5" fill="currentColor"/>
-  </svg>`;
-
-  const dropdown = document.createElement('div');
-  dropdown.className = 'dropdown-menu hidden';
-
-  const pinItem = document.createElement('div');
-  pinItem.className = 'menu-item';
-  pinItem.textContent = state.alwaysOnTop ? '取消置顶' : '窗口置顶';
-  pinItem.onclick = async (e) => {
-    e.stopPropagation();
-    state.alwaysOnTop = !state.alwaysOnTop;
-    await callGo('SetAlwaysOnTop', state.alwaysOnTop);
+  // 置顶大头钉按钮
+  const pinBtn = document.createElement('button');
+  pinBtn.className = 'titlebar-btn pin-btn' + (state.pinned ? ' active' : '');
+  pinBtn.title = state.pinned ? '取消置顶' : '窗口置顶';
+  pinBtn.innerHTML = getPinSvg(state.pinned);
+  pinBtn.onclick = async () => {
+    state.pinned = !state.pinned;
+    await callGo('SetAlwaysOnTop', state.pinned);
+    pinBtn.className = 'titlebar-btn pin-btn' + (state.pinned ? ' active' : '');
+    pinBtn.title = state.pinned ? '取消置顶' : '窗口置顶';
+    pinBtn.innerHTML = getPinSvg(state.pinned);
     scheduleSave();
-    state.menuOpen = false;
-    dropdown.classList.add('hidden');
-    pinItem.textContent = state.alwaysOnTop ? '取消置顶' : '窗口置顶';
-  };
-
-  dropdown.appendChild(pinItem);
-  menuContainer.appendChild(menuBtn);
-  menuContainer.appendChild(dropdown);
-
-  menuBtn.onclick = (e) => {
-    e.stopPropagation();
-    state.menuOpen = !state.menuOpen;
-    dropdown.classList.toggle('hidden', !state.menuOpen);
   };
 
   // 关闭按钮
@@ -167,84 +153,38 @@ function renderTitleBar() {
   closeBtn.className = 'titlebar-btn close-btn';
   closeBtn.title = '关闭';
   closeBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 12 12">
-    <line x1="1" y1="1" x2="11" y2="11" stroke="currentColor" stroke-width="1.8"/>
-    <line x1="11" y1="1" x2="1" y2="11" stroke="currentColor" stroke-width="1.8"/>
+    <line x1="2" y1="2" x2="10" y2="10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+    <line x1="10" y1="2" x2="2" y2="10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
   </svg>`;
   closeBtn.onclick = () => callGo('WindowClose');
 
   bar.appendChild(addBtn);
   bar.appendChild(drag);
-  bar.appendChild(menuContainer);
+  bar.appendChild(pinBtn);
   bar.appendChild(closeBtn);
   return bar;
 }
 
-// ---- 页签栏 ----
-function renderPageTabs() {
-  const container = document.createElement('div');
-  container.className = 'page-tabs';
-  if (state.pages.length <= 1) {
-    container.classList.add('hidden');
-    return container;
+function getPinSvg(pinned) {
+  if (pinned) {
+    // 实心大头钉（已置顶）
+    return `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M16 2L14.5 3.5L15 6L10 11H6L4.5 12.5L9 17L4 22H6L11 17L15.5 21.5L17 20V16L22 11L24.5 11.5L26 10L16 2Z"
+        transform="scale(0.75) translate(2,2)"
+        fill="currentColor" stroke="currentColor" stroke-width="0.5" stroke-linejoin="round"/>
+    </svg>`;
   }
-
-  state.pages.forEach(page => {
-    const tab = document.createElement('div');
-    tab.className = 'tab' + (page.id === state.activePageId ? ' active' : '');
-
-    const title = document.createElement('span');
-    title.className = 'tab-title';
-    title.textContent = page.title;
-    tab.appendChild(title);
-
-    if (state.pages.length > 1) {
-      const closeBtn = document.createElement('button');
-      closeBtn.className = 'tab-close';
-      closeBtn.innerHTML = `<svg width="8" height="8" viewBox="0 0 8 8">
-        <line x1="1" y1="1" x2="7" y2="7" stroke="currentColor" stroke-width="1.5"/>
-        <line x1="7" y1="1" x2="1" y2="7" stroke="currentColor" stroke-width="1.5"/>
-      </svg>`;
-      closeBtn.onclick = (e) => {
-        e.stopPropagation();
-        const idx = state.pages.findIndex(p => p.id === page.id);
-        state.pages.splice(idx, 1);
-        if (state.activePageId === page.id) {
-          state.activePageId = state.pages[Math.min(idx, state.pages.length - 1)].id;
-        }
-        scheduleSave();
-        render();
-      };
-      tab.appendChild(closeBtn);
-    }
-
-    tab.onclick = () => {
-      if (state.activePageId !== page.id) {
-        saveCurrentEditor();
-        state.activePageId = page.id;
-        scheduleSave();
-        render();
-      }
-    };
-
-    container.appendChild(tab);
-  });
-
-  return container;
+  // 空心大头钉（未置顶）
+  return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+    <path d="M16 2L14.5 3.5L15 6L10 11H6L4.5 12.5L9 17L4 22H6L11 17L15.5 21.5L17 20V16L22 11L24.5 11.5L26 10L16 2Z"
+      transform="scale(0.75) translate(2,2)"
+      fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+  </svg>`;
 }
 
 // ---- 编辑器 ----
 let editorEl = null;
 let isComposing = false;
-
-function saveCurrentEditor() {
-  if (editorEl) {
-    const page = getActivePage();
-    if (page) {
-      page.content = editorEl.innerHTML;
-      page.updatedAt = Date.now();
-    }
-  }
-}
 
 function renderEditor() {
   const container = document.createElement('div');
@@ -255,29 +195,32 @@ function renderEditor() {
   editor.contentEditable = 'true';
   editor.spellcheck = false;
 
-  const page = getActivePage();
-  if (page) {
-    editor.innerHTML = page.content;
+  if (state.page) {
+    if (state.page.content) {
+      editor.innerHTML = state.page.content;
+    } else {
+      editor.setAttribute('data-placeholder', '记笔记...');
+    }
   }
 
   editor.addEventListener('input', () => {
     if (isComposing) return;
-    const page = getActivePage();
-    if (page) {
-      page.content = editor.innerHTML;
-      page.updatedAt = Date.now();
-      scheduleSave();
-    }
+    syncEditorToState(editor);
   });
 
   editor.addEventListener('compositionstart', () => { isComposing = true; });
   editor.addEventListener('compositionend', () => {
     isComposing = false;
-    const page = getActivePage();
-    if (page) {
-      page.content = editor.innerHTML;
-      page.updatedAt = Date.now();
-      scheduleSave();
+    syncEditorToState(editor);
+  });
+
+  editor.addEventListener('focus', () => {
+    editor.removeAttribute('data-placeholder');
+  });
+
+  editor.addEventListener('blur', () => {
+    if (!editor.innerHTML || editor.innerHTML === '<br>') {
+      editor.setAttribute('data-placeholder', '记笔记...');
     }
   });
 
@@ -290,12 +233,7 @@ function renderEditor() {
         const checked = target.getAttribute('data-checked') === 'true';
         target.setAttribute('data-checked', String(!checked));
         e.preventDefault();
-        const page = getActivePage();
-        if (page) {
-          page.content = editor.innerHTML;
-          page.updatedAt = Date.now();
-          scheduleSave();
-        }
+        syncEditorToState(editor);
       }
     }
   });
@@ -303,6 +241,13 @@ function renderEditor() {
   editorEl = editor;
   container.appendChild(editor);
   return container;
+}
+
+function syncEditorToState(editor) {
+  if (!state.page) return;
+  state.page.content = editor.innerHTML;
+  state.page.updatedAt = Date.now();
+  scheduleSave();
 }
 
 // ---- 格式工具栏 ----
@@ -316,7 +261,7 @@ function renderFormatToolbar() {
     btn.title = title;
     btn.innerHTML = html;
     btn.addEventListener('mousedown', (e) => {
-      e.preventDefault(); // 不抢焦点
+      e.preventDefault();
       action();
     });
     bar.appendChild(btn);
@@ -375,7 +320,6 @@ function insertTodoList() {
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0) return;
 
-  // 检查是否已在todo-list中
   let node = sel.getRangeAt(0).startContainer;
   while (node && node !== editorEl) {
     if (node instanceof HTMLUListElement && node.classList.contains('todo-list')) {

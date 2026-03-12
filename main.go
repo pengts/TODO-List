@@ -2,6 +2,7 @@ package main
 
 import (
 	"embed"
+	"flag"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -12,8 +13,13 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
+var pageIDFlag string
+
 func main() {
-	app := NewApp()
+	flag.StringVar(&pageIDFlag, "page-id", "", "page id to open")
+	flag.Parse()
+
+	app := NewApp(pageIDFlag)
 
 	err := wails.Run(&options.App{
 		Title:     "TODO List",

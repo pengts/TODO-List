@@ -10,8 +10,16 @@ export function GetAlwaysOnTop() {
   return window['go']['main']['App']['GetAlwaysOnTop']();
 }
 
+export function GetPageID() {
+  return window['go']['main']['App']['GetPageID']();
+}
+
 export function LoadData() {
   return window['go']['main']['App']['LoadData']();
+}
+
+export function NewWindow(arg1) {
+  return window['go']['main']['App']['NewWindow'](arg1);
 }
 
 export function SaveData(arg1) {

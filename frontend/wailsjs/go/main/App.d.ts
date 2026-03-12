@@ -6,7 +6,11 @@ export function GenerateID():Promise<string>;
 
 export function GetAlwaysOnTop():Promise<boolean>;
 
+export function GetPageID():Promise<string>;
+
 export function LoadData():Promise<any>;
+
+export function NewWindow(arg1:string):Promise<void>;
 
 export function SaveData(arg1:any):Promise<void>;
 
