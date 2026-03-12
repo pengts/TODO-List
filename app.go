@@ -23,7 +23,8 @@ type NotePage struct {
 
 // AppSettings 应用设置
 type AppSettings struct {
-	AlwaysOnTop map[string]bool `json:"alwaysOnTop"`
+	AlwaysOnTop map[string]bool   `json:"alwaysOnTop"`
+	Themes      map[string]string `json:"themes"`
 }
 
 // AppData 持久化数据
@@ -76,6 +77,9 @@ func (a *App) LoadData() *AppData {
 	if appData.Settings.AlwaysOnTop == nil {
 		appData.Settings.AlwaysOnTop = make(map[string]bool)
 	}
+	if appData.Settings.Themes == nil {
+		appData.Settings.Themes = make(map[string]string)
+	}
 	return &appData
 }
 
@@ -83,6 +87,9 @@ func (a *App) LoadData() *AppData {
 func (a *App) SaveData(appData AppData) error {
 	if appData.Settings.AlwaysOnTop == nil {
 		appData.Settings.AlwaysOnTop = make(map[string]bool)
+	}
+	if appData.Settings.Themes == nil {
+		appData.Settings.Themes = make(map[string]string)
 	}
 	data, err := json.MarshalIndent(appData, "", "  ")
 	if err != nil {
@@ -137,5 +144,6 @@ func (a *App) DeletePage(pageID string) error {
 	}
 	appData.Pages = filtered
 	delete(appData.Settings.AlwaysOnTop, pageID)
+	delete(appData.Settings.Themes, pageID)
 	return a.SaveData(*appData)
 }

@@ -21,12 +21,34 @@ async function callGo(fn, ...args) {
   return null;
 }
 
+// ---- 颜色主题 ----
+const THEMES = {
+  green:  { bg: '#d4edbc', titlebar: '#c6e4a5', toolbar: '#c6e4a5', hover: '#b8dc94', active: '#a8d080', border: '#b0d490', check: '#8ab86e' },
+  yellow: { bg: '#f5f0c1', titlebar: '#ece6a0', toolbar: '#ece6a0', hover: '#e3da85', active: '#d9ce6e', border: '#d9ce6e', check: '#c4b94e' },
+  blue:   { bg: '#c9e0f5', titlebar: '#afd1ee', toolbar: '#afd1ee', hover: '#96c2e6', active: '#7db3de', border: '#96c2e6', check: '#6a9fd0' },
+  pink:   { bg: '#f5d0d8', titlebar: '#edb8c4', toolbar: '#edb8c4', hover: '#e4a0b0', active: '#db899d', border: '#e4a0b0', check: '#d07088' },
+  purple: { bg: '#ddd0f0', titlebar: '#cdbde6', toolbar: '#cdbde6', hover: '#bca8dc', active: '#ab94d2', border: '#bca8dc', check: '#9a7ec8' },
+  orange: { bg: '#fce0c4', titlebar: '#f8d0a6', toolbar: '#f8d0a6', hover: '#f4c08a', active: '#f0b06e', border: '#f0b06e', check: '#e09840' },
+};
+
+function applyTheme(themeName) {
+  const t = THEMES[themeName] || THEMES.green;
+  const root = document.documentElement;
+  root.style.setProperty('--bg-primary', t.bg);
+  root.style.setProperty('--bg-titlebar', t.titlebar);
+  root.style.setProperty('--bg-toolbar', t.toolbar);
+  root.style.setProperty('--bg-hover', t.hover);
+  root.style.setProperty('--bg-active', t.active);
+  root.style.setProperty('--border-color', t.border);
+}
+
 // ---- 状态 ----
 let state = {
   page: null,      // 当前窗口的页面
   pageId: '',      // 当前窗口绑定的pageId
   allData: null,   // 全部数据（用于保存）
   pinned: false,
+  theme: 'green',
 };
 
 let saveTimer = null;
@@ -45,9 +67,11 @@ function scheduleSave() {
     if (idx >= 0) {
       state.allData.pages[idx] = state.page;
     }
-    // 保存置顶状态
+    // 保存置顶和主题状态
     if (!state.allData.settings.alwaysOnTop) state.allData.settings.alwaysOnTop = {};
     state.allData.settings.alwaysOnTop[state.pageId] = state.pinned;
+    if (!state.allData.settings.themes) state.allData.settings.themes = {};
+    state.allData.settings.themes[state.pageId] = state.theme;
     callGo('SaveData', state.allData);
   }, 300);
 }
@@ -60,6 +84,7 @@ async function loadData() {
   if (data && data.pages && data.pages.length > 0) {
     if (!data.settings) data.settings = {};
     if (!data.settings.alwaysOnTop) data.settings.alwaysOnTop = {};
+    if (!data.settings.themes) data.settings.themes = {};
     state.allData = data;
 
     if (state.pageId) {
@@ -71,6 +96,7 @@ async function loadData() {
       state.pageId = state.page.id;
     }
     state.pinned = data.settings.alwaysOnTop[state.pageId] || false;
+    state.theme = data.settings.themes[state.pageId] || 'green';
   } else {
     // 首次启动，创建默认页
     const page = {
@@ -92,6 +118,7 @@ async function loadData() {
   if (state.pinned) {
     callGo('SetAlwaysOnTop', true);
   }
+  applyTheme(state.theme);
 }
 
 // ---- 渲染 ----
@@ -432,6 +459,64 @@ function renderFormatToolbar() {
       <line x1="9" y1="12" x2="15" y2="12" stroke="currentColor" stroke-width="1.5"/>
     </svg>`,
     () => insertTodoList());
+
+  // 右侧弹性间距
+  const spacer = document.createElement('div');
+  spacer.style.flex = '1';
+  bar.appendChild(spacer);
+
+  // 颜色选择器
+  const colorContainer = document.createElement('div');
+  colorContainer.className = 'color-picker-container';
+
+  const colorBtn = document.createElement('button');
+  colorBtn.className = 'toolbar-btn color-btn';
+  colorBtn.title = '更换颜色';
+  colorBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16">
+    <circle cx="8" cy="8" r="6" fill="${THEMES[state.theme].active}" stroke="${THEMES[state.theme].border}" stroke-width="1.5"/>
+  </svg>`;
+
+  const colorPanel = document.createElement('div');
+  colorPanel.className = 'color-panel hidden';
+
+  Object.keys(THEMES).forEach(name => {
+    const dot = document.createElement('button');
+    dot.className = 'color-dot' + (name === state.theme ? ' active' : '');
+    dot.style.background = THEMES[name].bg;
+    dot.style.borderColor = THEMES[name].active;
+    dot.title = name;
+    dot.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      state.theme = name;
+      applyTheme(name);
+      scheduleSave();
+      // 更新按钮和面板状态
+      colorBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16">
+        <circle cx="8" cy="8" r="6" fill="${THEMES[name].active}" stroke="${THEMES[name].border}" stroke-width="1.5"/>
+      </svg>`;
+      colorPanel.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
+      dot.classList.add('active');
+      colorPanel.classList.add('hidden');
+    });
+    colorPanel.appendChild(dot);
+  });
+
+  colorBtn.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    colorPanel.classList.toggle('hidden');
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.color-picker-container')) {
+      colorPanel.classList.add('hidden');
+    }
+  });
+
+  colorContainer.appendChild(colorBtn);
+  colorContainer.appendChild(colorPanel);
+  bar.appendChild(colorContainer);
 
   return bar;
 }
