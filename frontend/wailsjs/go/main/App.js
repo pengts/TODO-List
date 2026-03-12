@@ -6,6 +6,10 @@ export function GenerateID() {
   return window['go']['main']['App']['GenerateID']();
 }
 
+export function DeletePage(arg1) {
+  return window['go']['main']['App']['DeletePage'](arg1);
+}
+
 export function GetAlwaysOnTop() {
   return window['go']['main']['App']['GetAlwaysOnTop']();
 }

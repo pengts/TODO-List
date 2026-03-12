@@ -125,10 +125,42 @@ function renderTitleBar() {
       updatedAt: Date.now(),
     };
     state.allData.pages.push(newPage);
-    // 先保存再开新窗口
     await callGo('SaveData', state.allData);
     await callGo('NewWindow', newPage.id);
   };
+
+  // 便签列表按钮
+  const listContainer = document.createElement('div');
+  listContainer.className = 'list-container';
+
+  const listBtn = document.createElement('button');
+  listBtn.className = 'titlebar-btn list-btn';
+  listBtn.title = '便签列表';
+  listBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16">
+    <line x1="1" y1="3" x2="15" y2="3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+    <line x1="1" y1="8" x2="15" y2="8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+    <line x1="1" y1="13" x2="15" y2="13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+  </svg>`;
+
+  const listPanel = document.createElement('div');
+  listPanel.className = 'note-list-panel hidden';
+
+  listBtn.onclick = async (e) => {
+    e.stopPropagation();
+    const isHidden = listPanel.classList.contains('hidden');
+    if (isHidden) {
+      // 重新从磁盘加载最新数据再显示
+      const freshData = await callGo('LoadData');
+      if (freshData && freshData.pages) {
+        state.allData = freshData;
+      }
+      renderNoteList(listPanel);
+    }
+    listPanel.classList.toggle('hidden');
+  };
+
+  listContainer.appendChild(listBtn);
+  listContainer.appendChild(listPanel);
 
   // 拖拽区
   const drag = document.createElement('div');
@@ -158,11 +190,100 @@ function renderTitleBar() {
   </svg>`;
   closeBtn.onclick = () => callGo('WindowClose');
 
+  // 点击其他区域关闭列表面板
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.list-container')) {
+      listPanel.classList.add('hidden');
+    }
+  });
+
   bar.appendChild(addBtn);
+  bar.appendChild(listContainer);
   bar.appendChild(drag);
   bar.appendChild(pinBtn);
   bar.appendChild(closeBtn);
   return bar;
+}
+
+// ---- 便签列表面板 ----
+function renderNoteList(panel) {
+  panel.innerHTML = '';
+
+  const pages = state.allData?.pages || [];
+  if (pages.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'note-list-empty';
+    empty.textContent = '暂无便签';
+    panel.appendChild(empty);
+    return;
+  }
+
+  pages.forEach(page => {
+    const item = document.createElement('div');
+    item.className = 'note-list-item' + (page.id === state.pageId ? ' current' : '');
+
+    const info = document.createElement('div');
+    info.className = 'note-list-info';
+    info.onclick = async () => {
+      if (page.id === state.pageId) return; // 当前页不重复打开
+      await callGo('NewWindow', page.id);
+      panel.classList.add('hidden');
+    };
+
+    const preview = document.createElement('div');
+    preview.className = 'note-list-preview';
+    // 提取纯文本预览
+    const text = stripHtml(page.content).trim();
+    preview.textContent = text ? text.slice(0, 30) + (text.length > 30 ? '...' : '') : '(空便签)';
+
+    const time = document.createElement('div');
+    time.className = 'note-list-time';
+    time.textContent = formatTime(page.updatedAt);
+
+    info.appendChild(preview);
+    info.appendChild(time);
+    item.appendChild(info);
+
+    // 删除按钮（当前页不允许删除自己）
+    if (page.id !== state.pageId) {
+      const delBtn = document.createElement('button');
+      delBtn.className = 'note-list-del';
+      delBtn.title = '永久删除';
+      delBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 12 12">
+        <line x1="2" y1="2" x2="10" y2="10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="10" y1="2" x2="2" y2="10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>`;
+      delBtn.onclick = async (e) => {
+        e.stopPropagation();
+        await callGo('DeletePage', page.id);
+        // 刷新allData
+        const freshData = await callGo('LoadData');
+        if (freshData) state.allData = freshData;
+        renderNoteList(panel);
+      };
+      item.appendChild(delBtn);
+    }
+
+    panel.appendChild(item);
+  });
+}
+
+function stripHtml(html) {
+  if (!html) return '';
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  return tmp.textContent || '';
+}
+
+function formatTime(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  if (d.toDateString() === now.toDateString()) {
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+  return `${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function getPinSvg(pinned) {

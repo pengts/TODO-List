@@ -108,6 +108,110 @@ html, body, #app {
   color: #fff;
 }
 
+/* ---- 便签列表 ---- */
+.list-container {
+  position: relative;
+}
+
+.note-list-panel {
+  position: absolute;
+  top: 100%;
+  left: -40px;
+  width: 260px;
+  max-height: 360px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+  padding: 6px 0;
+  z-index: 200;
+}
+
+.note-list-panel::-webkit-scrollbar {
+  width: 4px;
+}
+
+.note-list-panel::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 2px;
+}
+
+.note-list-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  gap: 8px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.note-list-item:hover {
+  background: #f0f8e8;
+}
+
+.note-list-item.current {
+  background: #e8f4d8;
+  cursor: default;
+}
+
+.note-list-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.note-list-preview {
+  font-size: 13px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.note-list-item.current .note-list-preview::after {
+  content: '  (当前)';
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.note-list-time {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.note-list-del {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 4px;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.12s, background 0.12s;
+}
+
+.note-list-item:hover .note-list-del {
+  opacity: 1;
+}
+
+.note-list-del:hover {
+  background: #fde8e8;
+  color: #d44;
+}
+
+.note-list-empty {
+  padding: 16px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
 /* ---- 编辑器 ---- */
 .editor-container {
   flex: 1;

@@ -4,6 +4,8 @@
 
 export function GenerateID():Promise<string>;
 
+export function DeletePage(arg1:string):Promise<void>;
+
 export function GetAlwaysOnTop():Promise<boolean>;
 
 export function GetPageID():Promise<string>;

@@ -122,3 +122,20 @@ func (a *App) WindowClose() {
 func (a *App) SetAlwaysOnTop(onTop bool) {
 	runtime.WindowSetAlwaysOnTop(a.ctx, onTop)
 }
+
+// DeletePage 从持久化数据中删除指定页面
+func (a *App) DeletePage(pageID string) error {
+	appData := a.LoadData()
+	if appData == nil {
+		return fmt.Errorf("no data")
+	}
+	filtered := make([]NotePage, 0, len(appData.Pages))
+	for _, p := range appData.Pages {
+		if p.ID != pageID {
+			filtered = append(filtered, p)
+		}
+	}
+	appData.Pages = filtered
+	delete(appData.Settings.AlwaysOnTop, pageID)
+	return a.SaveData(*appData)
+}
