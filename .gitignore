@@ -1,6 +1,4 @@
 node_modules/
 dist/
-build/bin/
 frontend/dist/
 frontend/node_modules/
-*.exe
