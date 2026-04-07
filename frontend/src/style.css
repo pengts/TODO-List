@@ -246,6 +246,10 @@ html, body, #app {
   font-size: 14px;
 }
 
+.note-editor font {
+  font-size: inherit !important;
+}
+
 /* placeholder */
 .note-editor[data-placeholder]:empty::before {
   content: attr(data-placeholder);

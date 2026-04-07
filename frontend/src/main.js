@@ -302,6 +302,43 @@ function stripHtml(html) {
   return tmp.textContent || '';
 }
 
+// 清洗 HTML：移除 <font> 标签和内联 font-size，防止字号爆炸
+function sanitizeContent(html) {
+  if (!html) return html;
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+
+  // 将 <font> 标签替换为 <span>，丢弃 size/face 属性
+  tmp.querySelectorAll('font').forEach(font => {
+    const span = document.createElement('span');
+    if (font.color) span.style.color = font.color;
+    span.innerHTML = font.innerHTML;
+    font.replaceWith(span);
+  });
+
+  // 移除所有元素上的内联 font-size
+  tmp.querySelectorAll('*').forEach(el => {
+    if (el.style && el.style.fontSize) {
+      el.style.removeProperty('font-size');
+      if (el.getAttribute('style') === '') el.removeAttribute('style');
+    }
+  });
+
+  return tmp.innerHTML;
+}
+
+// 清除元素及其子元素上的内联 color 样式
+function clearInlineColor(element) {
+  const clear = el => {
+    if (el.style && el.style.color) {
+      el.style.removeProperty('color');
+      if (el.getAttribute('style') === '') el.removeAttribute('style');
+    }
+  };
+  clear(element);
+  element.querySelectorAll('*').forEach(clear);
+}
+
 function formatTime(ts) {
   if (!ts) return '';
   const d = new Date(ts);
@@ -345,7 +382,13 @@ function renderEditor() {
 
   if (state.page) {
     if (state.page.content) {
-      editor.innerHTML = state.page.content;
+      const cleaned = sanitizeContent(state.page.content);
+      editor.innerHTML = cleaned;
+      if (cleaned !== state.page.content) {
+        state.page.content = cleaned;
+        state.page.updatedAt = Date.now();
+        scheduleSave();
+      }
     } else {
       editor.setAttribute('data-placeholder', '记笔记...');
     }
@@ -360,6 +403,14 @@ function renderEditor() {
   editor.addEventListener('compositionend', () => {
     isComposing = false;
     syncEditorToState(editor);
+  });
+
+  editor.addEventListener('paste', (e) => {
+    e.preventDefault();
+    const text = e.clipboardData.getData('text/plain');
+    if (text) {
+      document.execCommand('insertText', false, text);
+    }
   });
 
   editor.addEventListener('focus', () => {
@@ -380,6 +431,9 @@ function renderEditor() {
       if (e.clientX - rect.left < 24) {
         const checked = target.getAttribute('data-checked') === 'true';
         target.setAttribute('data-checked', String(!checked));
+        if (checked) {
+          clearInlineColor(target);
+        }
         e.preventDefault();
         syncEditorToState(editor);
       }
