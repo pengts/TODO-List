@@ -608,8 +608,29 @@ function insertTodoList() {
   }
 }
 
+// ---- DPI 变化补偿 ----
+// go-webview2 硬编码 ShouldDetectMonitorScaleChanges=false，
+// 切换显示器时 WebView2 不会自动调整 RasterizationScale，需要 JS 侧补偿
+function setupDPICompensation() {
+  let lastDpr = window.devicePixelRatio || 1;
+
+  function onDprChange() {
+    const newDpr = window.devicePixelRatio || 1;
+    if (Math.abs(newDpr - lastDpr) > 0.01) {
+      // DPI 变化，用 CSS zoom 补偿差异
+      document.documentElement.style.zoom = String(lastDpr / newDpr);
+      lastDpr = newDpr;
+    }
+    // 持续监听后续变化
+    matchMedia(`(resolution: ${newDpr}dppx)`).addEventListener('change', onDprChange, { once: true });
+  }
+
+  matchMedia(`(resolution: ${lastDpr}dppx)`).addEventListener('change', onDprChange, { once: true });
+}
+
 // ---- 启动 ----
 initBindings().then(async () => {
   await loadData();
   render();
+  setupDPICompensation();
 });

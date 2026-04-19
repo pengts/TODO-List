@@ -18,6 +18,9 @@
 - 标题栏列表按钮可查看所有便签、打开已关闭的便签、永久删除便签
 - 关闭窗口不删除数据，数据始终保留在 data.json 中
 - 编辑器使用 contenteditable，content 存储 HTML
+- 内容加载时经过 `sanitizeContent` 清洗（移除 `<font>` 标签和内联 font-size），防止 WebView2 版本更新后旧 HTML 字号爆炸
+- 粘贴操作强制纯文本，阻止外部富文本格式污染
+- TODO 取消勾选时通过 `clearInlineColor` 清除浏览器烘焙的内联灰色样式
 
 ## 构建命令
 ```bash
@@ -32,3 +35,5 @@ GOOS=windows GOARCH=amd64 go build -tags desktop,production -ldflags="-s -w -H w
 - Go 的 PATH 在此服务器上需要: export PATH=$PATH:/usr/local/go/bin
 - 编译 exe 必须带 -tags desktop,production，否则启动时报错
 - wailsjs 绑定文件需手动同步，新增/修改 Go 导出方法后更新 frontend/wailsjs/go/main/App.js 和 App.d.ts
+- contenteditable 环境下浏览器会将 CSS 计算样式烘焙为内联 style，修改 CSS 选择器状态不会自动清除内联样式，需要手动处理
+- 不要在 contenteditable 内容中依赖相对字号单位（em/larger/%），会因嵌套标签累积而指数级放大
