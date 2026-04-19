@@ -130,6 +130,12 @@ func (a *App) SetAlwaysOnTop(onTop bool) {
 	runtime.WindowSetAlwaysOnTop(a.ctx, onTop)
 }
 
+// GetWindowSize 返回窗口的逻辑尺寸（DPI无关，用于前端DPI补偿）
+func (a *App) GetWindowSize() map[string]int {
+	w, h := runtime.WindowGetSize(a.ctx)
+	return map[string]int{"width": w, "height": h}
+}
+
 // DeletePage 从持久化数据中删除指定页面
 func (a *App) DeletePage(pageID string) error {
 	appData := a.LoadData()

@@ -18,6 +18,8 @@ export function SaveData(arg1:any):Promise<void>;
 
 export function SetAlwaysOnTop(arg1:boolean):Promise<void>;
 
+export function GetWindowSize():Promise<{width:number, height:number}>;
+
 export function WindowClose():Promise<void>;
 
 export function WindowMinimise():Promise<void>;

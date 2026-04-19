@@ -34,6 +34,10 @@ export function SetAlwaysOnTop(arg1) {
   return window['go']['main']['App']['SetAlwaysOnTop'](arg1);
 }
 
+export function GetWindowSize() {
+  return window['go']['main']['App']['GetWindowSize']();
+}
+
 export function WindowClose() {
   return window['go']['main']['App']['WindowClose']();
 }

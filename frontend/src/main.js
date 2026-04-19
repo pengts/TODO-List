@@ -610,22 +610,43 @@ function insertTodoList() {
 
 // ---- DPI 变化补偿 ----
 // go-webview2 硬编码 ShouldDetectMonitorScaleChanges=false，
-// 切换显示器时 WebView2 不会自动调整 RasterizationScale，需要 JS 侧补偿
+// 切换显示器时 WebView2 不会自动调整 RasterizationScale，需要 JS 侧补偿。
+// 原理：Go 的 WindowGetSize 返回 DPI 无关的逻辑尺寸，而 JS 的 innerWidth
+// 返回基于冻结 RasterizationScale 计算的 CSS 视口宽度。两者的比值就是
+// DPI 偏移量，用 CSS zoom 补偿即可。
 function setupDPICompensation() {
-  let lastDpr = window.devicePixelRatio || 1;
+  let currentZoom = 1.0;
+  let timer = null;
 
-  function onDprChange() {
-    const newDpr = window.devicePixelRatio || 1;
-    if (Math.abs(newDpr - lastDpr) > 0.01) {
-      // DPI 变化，用 CSS zoom 补偿差异
-      document.documentElement.style.zoom = String(lastDpr / newDpr);
-      lastDpr = newDpr;
+  async function correctZoom() {
+    const size = await callGo('GetWindowSize');
+    if (!size || !size.width || size.width <= 0) return;
+
+    const logicalWidth = size.width;
+    // innerWidth 受当前 CSS zoom 影响：innerWidth = rawCSS / zoom
+    // 还原为未缩放的原始 CSS 视口宽度
+    const rawCSSWidth = Math.round(window.innerWidth * currentZoom);
+
+    if (rawCSSWidth <= 0) return;
+
+    const ratio = rawCSSWidth / logicalWidth;
+
+    if (Math.abs(ratio - 1.0) > 0.05) {
+      document.documentElement.style.zoom = String(ratio);
+      currentZoom = ratio;
+    } else if (Math.abs(currentZoom - 1.0) > 0.01) {
+      document.documentElement.style.zoom = '';
+      currentZoom = 1.0;
     }
-    // 持续监听后续变化
-    matchMedia(`(resolution: ${newDpr}dppx)`).addEventListener('change', onDprChange, { once: true });
   }
 
-  matchMedia(`(resolution: ${lastDpr}dppx)`).addEventListener('change', onDprChange, { once: true });
+  window.addEventListener('resize', () => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(correctZoom, 100);
+  });
+
+  // 启动时检查（窗口可能在非主显示器上打开）
+  setTimeout(correctZoom, 200);
 }
 
 // ---- 启动 ----
